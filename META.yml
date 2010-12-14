@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Data-Generator
-version:            0.011
+version:            0.01_1
 abstract:           A small data generator
 author:
     - Eriam Schaffter <eriam@cpan.org>

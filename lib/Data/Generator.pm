@@ -13,7 +13,7 @@ with qw/
 	MooseX::Getopt
 /;
 
-our $VERSION = 0.01_1;
+our $VERSION = "0.01_1";
 
 has 'ddl'      	=> (is => 'rw', isa => 'Str', required => 1);
 has 'lines'    	=> (is => 'rw', isa => 'Int', required => 1);
@@ -132,6 +132,8 @@ sub rand_varchar {
    my ($opt) = @_;
    
    my $str_random = String::Random->new;
+   
+   $opt->{size} = 10 unless defined($opt->{size});
    
    my $string;
    
