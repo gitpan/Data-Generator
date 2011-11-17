@@ -1,195 +1,141 @@
 package Data::Generator;
-
-use Moose;
-
-use Data::Dumper;
-use SQL::Translator;
-
-use DateTime;
-use DateTime::Format::MySQL;
-use String::Random;
-
-with qw/
-	MooseX::Getopt
+use strict;
+use warnings;
+use Exporter qw/import/;
+use Data::Generator::Base;
+use Data::Generator::Array;
+use Data::Generator::Deeply;
+use Data::Generator::Range;
+our @EXPORT_OK = qw/
+    generator
+    pattern
+    range
+    independ
+    EACH_LAST
+    EACH_NEXT
 /;
 
-our $VERSION = "0.01_1";
+our $VERSION = '0.01';
 
-has 'ddl'      	=> (is => 'rw', isa => 'Str', required => 1);
-has 'lines'    	=> (is => 'rw', isa => 'Int', required => 1);
-
-$| = 1;
-
-sub BUILD {
-   my ($self, $opt) = (@_);
-   
-   # ...
-   
+sub EACH_LAST {
+    Data::Generator::Base->LAST;
+}
+sub EACH_NEXT {
+    Data::Generator::Base->NEXT;
 }
 
-
-sub run {
-   my ($self, $opt) = (@_);
-
-   my $t = SQL::Translator->new(        
-      show_warnings     => 1,
-      add_drop_table    => 1,      
-      quote_table_names => 1,
-      quote_field_names => 1,
-      parser            => 'MySQL',
-      producer          => 'MySQL',
-   );
-
-   $t->filters( sub { $self->_filter(@_) }) or die $t->error;
-   
-   print $self->ddl."\n";
-   
-   $t->translate( $self->ddl );
-
+sub pattern {
+    return Data::Generator::Array->new(\@_);
 }
 
-
-sub _filter {        
-   my ($self, $schema) = (@_);
-
-   for my $table ( $schema->get_tables ) {   
-
-      my @fields_func;
-      
-      print $table->name.":\n";
-
-      foreach my $field ($table->get_fields) {
-         $field->name(lc($field->name));
-         $field->data_type(lc($field->data_type));
-         
-         print $field->name.' / '.$field->data_type.' / '.$field->size.' / '.$field->comments."\n";
-         
-         if ($field->comments =~ /^rand_/) {
-            push @fields_func, $field->comments;
-         }
-         else {
-            
-            if ($field->data_type eq 'varchar') {
-               push @fields_func, "rand_varchar({size => ".$field->size.", regex => '\\w\\w\\w\\w'})";
-            }
-            elsif ($field->data_type eq 'longblob') {
-               push @fields_func, "rand_int()";
-            }
-            elsif ($field->data_type eq 'datetime') {
-               push @fields_func, "rand_datetime({ year_start => 2000, year_end => 2010,})";
-            }
-            elsif ($field->data_type eq 'char') {
-               push @fields_func, "chr(int(rand_int()))";
-            }
-            elsif ($field->data_type eq 'int') {
-               push @fields_func, "rand_int()";
-            }
-            elsif ($field->data_type eq 'float') {
-               push @fields_func, "rand_float()";
-            }
-            
-         }
-      }
-      
-      open (F, '>', './'.$table->name.'.csv');
-                  
-      for (1 .. $self->lines) {
-         foreach my $func (@fields_func) {
-            print F eval($func).";";
-            print $@ if $@;
-         }
-         print F "\n";
-      }
-      close (F);
-      
-
-      print "\n\n";
-
-   }
-
+sub independ {
+    my ( $target ) = @_;
+    return Data::Generator::Deeply::independ($target);
+}
+sub generator{
+    my ( $target ) = @_;
+    return Data::Generator::Deeply->compose($target);
 }
 
-
-
-sub rand_datetime {
-   my ($opt) = @_;
-   
-   my $dt = DateTime->new( 
-      year   => $opt->{year_start} + int(rand($opt->{year_end} - $opt->{year_start})),
-      month  => 1 + int(rand(11)),
-      day    => 1 + int(rand(30)),
-   );
-   
-   return DateTime::Format::MySQL->format_datetime($dt);
-   
-   
+sub range {
+    my ( $start,$end,$succ) = @_;
+    return Data::Generator::Range->new($start,$end,$succ);
 }
-
-
-
-
-sub rand_varchar {
-   my ($opt) = @_;
-   
-   my $str_random = String::Random->new;
-   
-   $opt->{size} = 10 unless defined($opt->{size});
-   
-   my $string;
-   
-   while (length($string) < $opt->{size}) {
-      $string .= $str_random->randregex($opt->{regex}).' ';
-   }
-   
-   chop($string);
-   
-   return $string;
-   
-}
-
-sub rand_int {
-   
-   return int(rand(10))
-   
-}
-
-sub rand_float {
-   
-   return int(rand(10))
-   
-}
-
 1;
-
-
 __END__
 
 =head1 NAME
 
-Data::Generator - A small data generator
+Data::Generator - some iterator utilities for perl
 
-=head1 STATUS
+=head1 SYNOPSIS
 
-This module is experimental.
+    use Data::Generator qw/pattern generator/;
+
+    my $cases = generator(
+        {   hoge  => pattern(qw/a b c/),
+            fuga  => pattern(qw/x y z/),
+            fixed => 0
+        }
+    );
+
+    for my $case ( $cases->list ){
+           print pp($case);
+    }
+
+     # { hoge => 'a',fuga => 'x'}
+     # { hoge => 'a',fuga => 'y'}
+     # { hoge => 'a',fuga => 'z'}
+     # { hoge => 'b',fuga => 'x'}
+     # { hoge => 'b',fuga => 'y'}
+     # { hoge => 'b',fuga => 'z'}
+     # { hoge => 'c',fuga => 'x'}
+     # { hoge => 'c',fuga => 'y'}
+     # { hoge => 'c',fuga => 'z'}
+     
 
 =head1 DESCRIPTION
 
-Data::Generator's goal is to ease the task of creating a sample
-data set based on a database schema.
+Data::Generator is utilities for iteration and test data generation 
+like itertools in python or C# IEnumerable.
 
-It uses SQL::Translator and creates CSV files.
+This module is marked B<EXPERIMENTAL>. API could be changed without any notice.
+
+=head2 pattern
+
+to create an iterator by a provided list.
+
+    my $gen = pattern(qw/a b c/);
+    # $gen->list => ('a','b','c')
+
+a generator can product another generator
+
+    my $gen = pattern(qw/a b c/)->product(pattern(qw/x y/));
+    # $gen->list
+    #  ["a", "x"],
+    #  ["a", "y"],
+    #  ["b", "x"],
+    #  ["b", "y"],
+    #  ["c", "x"],
+    #  ["c", "y"],
+
+
+=head2 generator
+
+to create all pattern of data structure which contains pattern.
+
+    my $users = generator({
+        sex      => pattern(qw/male female/),
+        age      => range(10,90,5),
+        category => pattern(qw/elf human dwarf gnome lizardman/)
+    })
+    
+this code is a syntax sugar of the following code:
+
+    my $user = pattern(qw/male female/)
+        ->product( range(10,90,5) )
+        ->product( pattern(qw/elf human dwarf gnome lizardman/))
+        ->select(sub{
+            +{ sex => $_[0]->[0],age => $_[0]->[1],category => $_[0]->[2]}
+        });
+
+so you can enumerate all pattern of users.
+
+    $user->each(sub{
+        my $user = shift;
+        $ do stuff
+    });
+
+=head1 AUTHOR
+
+Daichi Hiroki E<lt>hirokidaichi {at} gmail.comE<gt>
+
+=head1 SEE ALSO
 
 
 =head1 LICENSE
 
-This program is free software; you can redistribute it and/or
-modify it under the same terms as Perl itself.
-
-=head1 AUTHOR
-
-Eriam Schaffter C<< <eriam@cpan.org> >>
-
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
 
 =cut
-
-

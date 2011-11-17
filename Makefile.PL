@@ -1,19 +1,21 @@
-use strict;
-use warnings;
-use ExtUtils::MakeMaker;
+use inc::Module::Install;
+name 'Data-Generator';
+all_from 'lib/Data/Generator.pm';
+readme_from 'lib/Data/Generator.pm';
 
-WriteMakefile(
-    NAME                => 'Data::Generator',
-    AUTHOR              => q{Eriam Schaffter <eriam@cpan.org>},
-    VERSION_FROM        => 'lib/Data/Generator.pm',
-    ABSTRACT_FROM       => 'lib/Data/Generator.pm',
-    ($ExtUtils::MakeMaker::VERSION >= 6.3002
-      ? ('LICENSE'=> 'perl')
-      : ()),
-    PL_FILES            => {},
-    PREREQ_PM => {
-        'Test::More' => 0,
-    },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'Data-Generator-*' },
-);
+githubmeta;
+
+requires 'Data::Visitor::Callback';
+requires 'List::MoreUtils';
+requires 'Scalar::Util';
+requires 'IO::File';
+requires 'Exporter';
+
+test_requires 'Test::More';
+tests 't/*.t';
+author_tests 'xt';
+
+build_requires 'Test::More';
+auto_set_repository;
+auto_include;
+WriteAll;
